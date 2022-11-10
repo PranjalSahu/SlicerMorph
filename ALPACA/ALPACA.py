@@ -14,7 +14,7 @@ import numpy as np
 from datetime import datetime
 import time
 import sys
-
+import itk
 
 #
 # ALPACA
@@ -148,7 +148,6 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
     # Ensure that correct version of open3d Python package is installed
-    needRestart = False
     needInstall = False
     
     try:
@@ -156,7 +155,6 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
       import cpdalp
     except ModuleNotFoundError:
       needInstall = True
-      needRestart = True
     
     if needInstall:
       progressDialog = slicer.util.createProgressDialog(labelText='Installing ITK RANSAC, ITK FPFH. This may take a minute...', maximum=0)
@@ -172,9 +170,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
       # the argument into multiple command-line arguments when there are spaces in the path)
       import cpdalp
       progressDialog.close()
-    if needRestart:
-      slicer.util.restart()
-
+    
     # Load widget from .ui file (created by Qt Designer).
     uiWidget = slicer.util.loadUI(self.resourcePath('UI/ALPACA.ui'))
     self.layout.addWidget(uiWidget)
@@ -218,7 +214,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
     # Advanced Settings connections
     self.ui.projectionFactorSlider.connect('valueChanged(double)', self.onChangeAdvanced)
     self.ui.pointDensityAdvancedSlider.connect('valueChanged(double)', self.onChangeAdvanced)
-    self.ui.normalSearchRadiusSlider.connect('valueChanged(double)', self.onChangeAdvanced)
+    self.ui.normalNeighborsCountSlider.connect('valueChanged(double)', self.onChangeAdvanced)
     self.ui.FPFHSearchRadiusSlider.connect('valueChanged(double)', self.onChangeAdvanced)
     self.ui.maximumCPDThreshold.connect('valueChanged(double)', self.onChangeAdvanced)
     self.ui.maxRANSAC.connect('valueChanged(double)', self.onChangeAdvanced)
@@ -264,7 +260,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
     self.parameterDictionary = {
       "projectionFactor": self.ui.projectionFactorSlider.value,
       "pointDensity": self.ui.pointDensityAdvancedSlider.value,
-      "normalSearchRadius" : self.ui.normalSearchRadiusSlider.value,
+      "normalNeighborsCount" : self.ui.normalNeighborsCountSlider.value,
       "FPFHSearchRadius" : self.ui.FPFHSearchRadiusSlider.value,
       "distanceThreshold" : self.ui.maximumCPDThreshold.value,
       "maxRANSAC" : int(self.ui.maxRANSAC.value),
@@ -359,7 +355,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
 
     # Display target points
     blue=[0,0,1]
-    self.targetCloudNodeTest = logic.displayPointCloud(self.targetVTK, self.voxelSize / 5, 'Target Pointcloud_test', blue)
+    self.targetCloudNodeTest = logic.displayPointCloud(self.targetVTK, self.voxelSize / 10, 'Target Pointcloud_test', blue)
     self.targetCloudNodeTest.GetDisplayNode().SetVisibility(True)
     self.updateLayout()
 
@@ -429,7 +425,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
     self.targetVTK = logic.convertPointsToVTK(self.targetPoints)
 
     blue=[0,0,1]
-    self.targetCloudNode_2 = logic.displayPointCloud(self.targetVTK, self.voxelSize / 5, 'Target Pointcloud_'+run_counter, blue)
+    self.targetCloudNode_2 = logic.displayPointCloud(self.targetVTK, self.voxelSize / 10, 'Target Pointcloud_'+run_counter, blue)
     self.targetCloudNode_2.GetDisplayNode().SetVisibility(False)
     # Output information on subsampling
     self.ui.subsampleInfo.clear()
@@ -449,7 +445,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
     self.sourceVTK = logic.convertPointsToVTK(self.sourcePoints)
     #
     red=[1,0,0]
-    self.sourceCloudNode = logic.displayPointCloud(self.sourceVTK, self.voxelSize / 5, ('Source Pointcloud (rigidly registered)_'+run_counter), red)
+    self.sourceCloudNode = logic.displayPointCloud(self.sourceVTK, self.voxelSize / 10, ('Source Pointcloud (rigidly registered)_'+run_counter), red)
     self.sourceCloudNode.GetDisplayNode().SetVisibility(False)
     #
     #Transform the source model
@@ -1018,7 +1014,7 @@ class ALPACAWidget(ScriptedLoadableModuleWidget):
     if hasattr(self, 'parameterDictionary'):
       self.parameterDictionary["projectionFactor"] = self.ui.projectionFactorSlider.value
       self.parameterDictionary["pointDensity"] = self.ui.pointDensityAdvancedSlider.value
-      self.parameterDictionary["normalSearchRadius"] = int(self.ui.normalSearchRadiusSlider.value)
+      self.parameterDictionary["normalNeighborsCount"] = int(self.ui.normalNeighborsCountSlider.value)
       self.parameterDictionary["FPFHSearchRadius"] = int(self.ui.FPFHSearchRadiusSlider.value)
       self.parameterDictionary["distanceThreshold"] = self.ui.maximumCPDThreshold.value
       self.parameterDictionary["maxRANSAC"] = int(self.ui.maxRANSAC.value)
@@ -1343,7 +1339,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     number_of_iterations,
     number_of_ransac_points,
     inlier_value):
-    import itk
     def GenerateData(data, agreeData):
         """
             In current implmentation the agreedata contains two corressponding 
@@ -1424,7 +1419,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     return itk.dict_from_transform(transform), bestPercentage, bestPercentage
   
   def get_euclidean_distance(self, input_fixedPoints, input_movingPoints):
-    import itk
     mesh_fixed = itk.Mesh[itk.D, 3].New()
     mesh_moving = itk.Mesh[itk.D, 3].New()
 
@@ -1440,7 +1434,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     return metric.GetValue()
 
   def final_iteration(self, fixedPoints, movingPoints, transform_type):
-    import itk
     """
     Perform the final iteration of alignment.
     Args:
@@ -1516,7 +1509,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     return vtk_polydata
 
   def transform_numpy_points(self, points_np, transform):
-    import itk
     mesh = itk.Mesh[itk.F, 3].New()
     mesh.SetPoints(itk.vector_container_from_array(points_np.flatten().astype('float32')))
     transformed_mesh = itk.transform_mesh_filter(mesh, transform=transform)
@@ -1527,7 +1519,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
   def estimateTransform(self, sourcePoints, targetPoints, sourceFeatures, targetFeatures, 
   voxelSize, skipScaling, parameters):
     print('Inside estimateTransform')
-    import itk
     # Establish correspondences by nearest neighbour search in feature space
     corrs_A, corrs_B = self.find_correspondences(
         targetFeatures, sourceFeatures, mutual_filter=True
@@ -1672,7 +1663,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     return point_array, normal_array
   
   def get_fpfh_feature(self, points_np, normals_np, radius, neighbors):
-    import itk
     pointset = itk.PointSet[itk.F, 3].New()
     pointset.SetPoints(
         itk.vector_container_from_array(points_np.flatten().astype("float32"))
@@ -1684,7 +1674,7 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     )
 
     fpfh = itk.Fpfh.PointFeature.MF3MF3.New()
-    fpfh.ComputeFPFHFeature(pointset, normalset, int(radius), int(neighbors))
+    fpfh.ComputeFPFHFeature(pointset, normalset, float(radius), int(neighbors))
     result = fpfh.GetFpfhFeature()
 
     fpfh_feats = itk.array_from_vector_container(result)
@@ -1711,8 +1701,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     return fixedLengths, diagonalLength
   
   def runSubsample(self, sourceModel, targetModel, skipScaling, parameters):
-    import itk
-    import copy
     import vtk
     from vtk.util import numpy_support
     print("parameters are ", parameters)
@@ -1773,8 +1761,8 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     sourceMesh_vtk = self.subsample_points_voxelgrid_polydata(sourceFullMesh_vtk, radius=5)
     targetMesh_vtk = self.subsample_points_voxelgrid_polydata(targetFullMesh_vtk, radius=5)
     
-    movingMeshPoints, movingMeshPointNormals = self.extract_pca_normal(sourceMesh_vtk, int(parameters["normalSearchRadius"]))
-    fixedMeshPoints, fixedMeshPointNormals = self.extract_pca_normal(targetMesh_vtk, int(parameters["normalSearchRadius"]))
+    movingMeshPoints, movingMeshPointNormals = self.extract_pca_normal(sourceMesh_vtk, int(parameters["normalNeighborsCount"]))
+    fixedMeshPoints, fixedMeshPointNormals = self.extract_pca_normal(targetMesh_vtk, int(parameters["normalNeighborsCount"]))
 
     print('------------------------------------------------------------')
     print("movingMeshPoints.shape ", movingMeshPoints.shape)
@@ -1784,7 +1772,6 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
     print('------------------------------------------------------------')
 
     fpfh_radius = parameters['FPFHSearchRadius']*voxel_size
-    print('fpfh_radius is ', fpfh_radius, ' voxel size is ', voxel_size)
     fpfh_neighbors = 100
     # New FPFH Code
     pcS = np.expand_dims(fixedMeshPoints, -1)
