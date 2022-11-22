@@ -2040,6 +2040,8 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
       extensionLM = ".fcsv"
     template_density = sparseTemplate.GetNumberOfPoints()
     ID_list = list()
+    logic = ALPACALogic()
+
     #Alignment and matching points
     referenceFileList = [f for f in os.listdir(modelsDir) if f.endswith(('.ply', '.stl', '.obj', '.vtk', '.vtp'))]
     for file in referenceFileList:
@@ -2048,12 +2050,17 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
       sourceModelNode.GetDisplayNode().SetVisibility(False)
       rootName = os.path.splitext(file)[0]
       skipScalingOption = False
-      sourcePoints, targetPoints, sourceFeatures, targetFeatures, voxelSize, scaling = self.runSubsample(sourceModelNode, targetModelNode,
+      sourcePoints, targetPoints, sourceFeatures, targetFeatures, voxelSize, scaling, offset_amount = self.runSubsample(sourceModelNode, targetModelNode,
         skipScalingOption, parameterDictionary)
       [ICPTransform_similarity, ICPTransform_rigid] = self.estimateTransform(sourcePoints, targetPoints, sourceFeatures, targetFeatures, voxelSize, skipScalingOption, parameterDictionary)
-      ICPTransformNode = self.convertMatrixToTransformNode(ICPTransform_rigid, 'Rigid Transformation Matrix')
-      sourceModelNode.SetAndObserveTransformNodeID(ICPTransformNode.GetID())
-      slicer.vtkSlicerTransformLogic().hardenTransform(sourceModelNode)
+      #ICPTransformNode = self.convertMatrixToTransformNode(ICPTransform_rigid, 'Rigid Transformation Matrix')
+      
+      sourceModelNode.SetAndObserveMesh(logic.transform_points_in_vtk(sourceModelNode.GetPolyData(), ICPTransform_similarity))
+      sourceModelNode.SetAndObserveMesh(logic.transform_points_in_vtk(sourceModelNode.GetPolyData(), ICPTransform_rigid))
+
+      #sourceModelNode.SetAndObserveTransformNodeID(ICPTransformNode.GetID())
+      #slicer.vtkSlicerTransformLogic().hardenTransform(sourceModelNode)
+
       alignedSubjectPolydata = sourceModelNode.GetPolyData()
       ID, correspondingSubjectPoints = self.GetCorrespondingPoints(sparseTemplate, alignedSubjectPolydata)
       ID_list.append(ID)
@@ -2065,7 +2072,7 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
       subjectFiducial.SetFixedNumberOfControlPoints(True)
       slicer.util.saveNode(subjectFiducial, os.path.join(pcdOutputDir, f"{rootName}" + extensionLM))
       slicer.mrmlScene.RemoveNode(sourceModelNode)
-      slicer.mrmlScene.RemoveNode(ICPTransformNode)
+      #slicer.mrmlScene.RemoveNode(ICPTransformNode)
       slicer.mrmlScene.RemoveNode(subjectFiducial)
     #Remove template node
     slicer.mrmlScene.RemoveNode(targetModelNode)
