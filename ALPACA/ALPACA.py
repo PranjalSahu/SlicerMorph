@@ -2018,7 +2018,7 @@ class ALPACALogic(ScriptedLoadableModuleLogic):
       sourceModelNode.GetDisplayNode().SetVisibility(False)
       rootName = os.path.splitext(file)[0]
       skipScalingOption = False
-      sourcePoints, targetPoints, sourceFeatures, targetFeatures, voxelSize, scaling = self.runSubsample(sourceModelNode, targetModelNode,
+      sourcePoints, targetPoints, sourceFeatures, targetFeatures, voxelSize, scaling, offset_amount = self.runSubsample(sourceModelNode, targetModelNode,
         skipScalingOption, parameterDictionary)
       [ICPTransform_similarity, ICPTransform_rigid] = self.estimateTransform(sourcePoints, targetPoints, sourceFeatures, targetFeatures, voxelSize, skipScalingOption, parameterDictionary)
       ICPTransformNode = self.convertMatrixToTransformNode(ICPTransform_rigid, 'Rigid Transformation Matrix')
